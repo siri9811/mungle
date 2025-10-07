@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import '../models/dog.dart';
 import '../services/dog_service.dart';
-import '../widgets/dog_card.dart'; // ✅ 분리한 위젯
-import '../widgets/app_logo.dart'; // ✅ 추가한 AppLogo 위젯
+import '../widgets/dog_card.dart'; // 분리한 위젯
+import '../widgets/app_logo.dart'; // 추가한 AppLogo 위젯
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});

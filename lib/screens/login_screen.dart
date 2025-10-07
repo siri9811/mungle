@@ -24,7 +24,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // 버튼들의 통일된 너비를 변수로 지정하면 관리하기 편합니다.
+    // 버튼 너비를 일정하게 유지하기 위한 상수
     const double buttonWidth = 300.0;
 
     return Scaffold(
