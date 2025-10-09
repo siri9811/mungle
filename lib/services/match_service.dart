@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/dog.dart';
@@ -6,44 +7,77 @@ class MatchService {
   static final _db = FirebaseFirestore.instance;
   static final _auth = FirebaseAuth.instance;
 
-  /// 사용자가 강아지를 스와이프할 때 호출
-  static Future<void> handleSwipe(Dog dog, bool liked) async {
+  /// 거리 기반 추천 (현재 로그인한 강아지를 제외하고)
+  static Future<List<Dog>> getNearbyDogs({
+  required double userLat,
+  required double userLng,
+  double maxDistanceKm = 1000,
+}) async {
+  try {
+    final snapshot = await _db.collection('users').get();
+    final currentUid = _auth.currentUser?.uid;
+
+    // Firestore에서 전체 Dog 불러오기
+    final allDogs = snapshot.docs
+        .map((d) => Dog.fromFirestore(d))
+        .where((dog) => dog.id != currentUid) // 자기 자신 제외
+        .toList();
+
+    // 거리 계산 + Dog 객체에 distanceKm 추가
+    List<Dog> withDistance = allDogs.map((dog) {
+      final distance = _calculateDistance(userLat, userLng, dog.lat, dog.lng);
+      return dog.copyWith(distanceKm: distance); // 거리 필드 추가
+    }).toList();
+
+    // 거리 제한 필터링
+    List<Dog> nearby = withDistance
+        .where((dog) => (dog.distanceKm ?? 99999) <= maxDistanceKm)
+        .toList();
+
+    // 가까운 순 정렬
+    nearby.sort((a, b) =>
+        (a.distanceKm ?? 0).compareTo(b.distanceKm ?? 0));
+
+    // 디버그 로그
+    for (var d in nearby) {
+      print("🐶 ${d.name}: ${d.distanceKm?.toStringAsFixed(2)} km");
+    }
+
+    return nearby;
+  } catch (e) {
+    print("🔥 MatchService.getNearbyDogs error: $e");
+    return [];
+  }
+}
+  /// 좋아요 / 싫어요 처리
+  static Future<void> handleSwipe(Dog targetDog, bool liked) async {
     final user = _auth.currentUser!;
     final userRef = _db.collection('users').doc(user.uid);
 
     try {
       if (liked) {
-        // 좋아요 추가 (필드 없으면 새로 생성)
         await userRef.set({
-          'liked': FieldValue.arrayUnion([dog.id]),
+          'liked': FieldValue.arrayUnion([targetDog.id]),
         }, SetOptions(merge: true));
 
-        // 상대방(ownerId)이 나를 이미 좋아했는지 확인
-        if (dog is! Dog || dog.id.isEmpty) return;
+        final targetRef = _db.collection('users').doc(targetDog.id);
+        final targetSnap = await targetRef.get();
+        final targetLikes = List<String>.from(targetSnap.data()?['liked'] ?? []);
 
-        final ownerId = (dog as dynamic).ownerId ?? '';
-        if (ownerId.isEmpty) return; // ownerId가 없으면 매칭 확인 불가
-
-        final ownerRef = _db.collection('users').doc(ownerId);
-        final ownerSnap = await ownerRef.get();
-
-        final likedList = List<String>.from(ownerSnap.data()?['liked'] ?? []);
-
-        if (likedList.contains(user.uid)) {
-          await _createMatch(user.uid, ownerId, dog);
+        if (targetLikes.contains(user.uid)) {
+          await _createMatch(user.uid, targetDog.id, targetDog);
         }
       } else {
-        // 싫어요 추가
         await userRef.set({
-          'disliked': FieldValue.arrayUnion([dog.id]),
+          'disliked': FieldValue.arrayUnion([targetDog.id]),
         }, SetOptions(merge: true));
       }
     } catch (e) {
-      print("🔥 MatchService.handleSwipe error: $e");
+      print("MatchService.handleSwipe error: $e");
     }
   }
 
-  /// 매칭 생성 시 호출
+  /// 매칭 + 채팅방 생성
   static Future<void> _createMatch(String uid1, String uid2, Dog dog) async {
     try {
       final matchRef = _db.collection('matches').doc();
@@ -55,14 +89,29 @@ class MatchService {
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      // 채팅방도 함께 생성
       await _db.collection('chats').doc(matchRef.id).set({
         'users': [uid1, uid2],
         'lastMessage': null,
         'createdAt': FieldValue.serverTimestamp(),
       });
+
+      print("Match + Chat room created successfully");
     } catch (e) {
-      print("🔥 MatchService._createMatch error: $e");
+      print("MatchService._createMatch error: $e");
     }
   }
+
+  /// 거리 계산
+  static double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+    const R = 6371;
+    final dLat = _deg2rad(lat2 - lat1);
+    final dLon = _deg2rad(lon2 - lon1);
+    final a = sin(dLat / 2) * sin(dLat / 2) +
+        cos(_deg2rad(lat1)) * cos(_deg2rad(lat2)) *
+        sin(dLon / 2) * sin(dLon / 2);
+    final c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    return R * c;
+  }
+
+  static double _deg2rad(double deg) => deg * pi / 180;
 }

@@ -39,6 +39,8 @@ dependencies:
   google_fonts: ^6.1.0
   # Http
   http: ^1.2.0
+  # 거리계산
+  geolocator: ^11.0.0
   
 
   # Kakao

@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
+import 'package:geolocator/geolocator.dart';
 import '../models/dog.dart';
-import '../services/dog_service.dart';
-import '../widgets/dog_card.dart'; // 분리한 위젯
-import '../widgets/app_logo.dart'; // 추가한 AppLogo 위젯
+import '../services/match_service.dart';
+import '../widgets/dog_card.dart';
+import '../widgets/app_logo.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -16,22 +17,67 @@ class _HomeScreenState extends State<HomeScreen> {
   final CardSwiperController controller = CardSwiperController();
   List<Dog> dogs = [];
   bool isLoading = true;
+  bool locationDenied = false;
 
   @override
   void initState() {
     super.initState();
-    loadDogs();
+    loadNearbyDogs();
   }
 
-  Future<void> loadDogs() async {
+  /// 📍 위치 권한 요청 + 거리 기반 강아지 리스트 불러오기
+  Future<void> loadNearbyDogs() async {
     try {
-      final fetchedDogs = await DogService.fetchDogs();
+      setState(() => isLoading = true);
+
+      // 위치 권한 요청
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        setState(() {
+          locationDenied = true;
+          isLoading = false;
+        });
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          setState(() {
+            locationDenied = true;
+            isLoading = false;
+          });
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        setState(() {
+          locationDenied = true;
+          isLoading = false;
+        });
+        return;
+      }
+
+      // ✅ 현재 위치 가져오기
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      // ✅ MatchService에서 가까운 강아지 불러오기
+      final fetchedDogs = await MatchService.getNearbyDogs(
+        userLat: position.latitude,
+        userLng: position.longitude,
+        maxDistanceKm: 1000, // 10km 이내
+      );
+
       setState(() {
         dogs = fetchedDogs;
         isLoading = false;
       });
     } catch (e) {
-      debugPrint("Error loading dogs: $e");
+      debugPrint("❌ Error loading nearby dogs: $e");
       setState(() {
         isLoading = false;
       });
@@ -46,15 +92,23 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
+    if (locationDenied) {
+      return const Scaffold(
+        body: Center(
+          child: Text("📍 위치 접근 권한이 필요합니다."),
+        ),
+      );
+    }
+
     if (dogs.isEmpty) {
       return const Scaffold(
-        body: Center(child: Text("등록된 강아지가 없습니다")),
+        body: Center(child: Text("근처에 등록된 강아지가 없습니다.")),
       );
     }
 
     return Scaffold(
       appBar: AppBar(
-        title: const AppLogo(   // ✅ AppLogo 위젯으로 교체
+        title: const AppLogo(
           fontSize: 28,
           color: Colors.black,
         ),
@@ -71,23 +125,26 @@ class _HomeScreenState extends State<HomeScreen> {
               cardsCount: dogs.length,
               numberOfCardsDisplayed: 1,
               isLoop: true,
-              onSwipe: (previousIndex, currentIndex, direction) {
-                if (previousIndex != null) {
-                  if (direction == CardSwiperDirection.right) {
-                    debugPrint("좋아요: ${dogs[previousIndex].name}");
-                  } else if (direction == CardSwiperDirection.left) {
-                    debugPrint("싫어요: ${dogs[previousIndex].name}");
-                  }
+              onSwipe: (previousIndex, currentIndex, direction) async {
+                final dog = dogs[previousIndex];
+
+                if (direction == CardSwiperDirection.right) {
+                  debugPrint("❤️ 좋아요: ${dog.name}");
+                  await MatchService.handleSwipe(dog, true);
+                } else if (direction == CardSwiperDirection.left) {
+                  debugPrint("💔 싫어요: ${dog.name}");
+                  await MatchService.handleSwipe(dog, false);
                 }
+
                 return true;
               },
               cardBuilder: (context, index, percentX, percentY) {
-                return DogCard(dog: dogs[index]); // ✅ 분리한 DogCard 위젯 사용
+                return DogCard(dog: dogs[index]);
               },
             ),
           ),
 
-          // ❤️ 좋아요/싫어요 버튼 (네비게이션바 위쪽 중간 지점)
+          // ❤️ 좋아요/싫어요 버튼 (하단)
           Padding(
             padding: const EdgeInsets.only(bottom: 60),
             child: Row(

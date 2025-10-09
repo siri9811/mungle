@@ -33,9 +33,9 @@ class DogCard extends StatelessWidget {
             SizedBox(
               height: screenHeight * 0.45,
               width: double.infinity,
-              child: dog.imageURL.isNotEmpty
+              child: dog.imageUrl.isNotEmpty
                   ? Image.network(
-                      dog.imageURL,
+                      dog.imageUrl,
                       fit: BoxFit.cover,
                       errorBuilder: (context, error, stackTrace) =>
                           const Icon(Icons.pets, size: 80, color: Colors.grey),
@@ -67,6 +67,26 @@ class DogCard extends StatelessWidget {
                       color: Colors.grey,
                     ),
                   ),
+
+                  // 거리 표시 추가 (null 안전)
+                  if (dog.distanceKm != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.location_on,
+                              color: Colors.redAccent, size: 20),
+                          const SizedBox(width: 4),
+                          Text(
+                            "${dog.distanceKm!.toStringAsFixed(1)} km 거리",
+                            style: const TextStyle(
+                              fontSize: 15,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                 ],
               ),
             ),
