@@ -5,12 +5,11 @@ class DogService {
   static Future<List<Dog>> fetchDogs() async {
     try {
       final snapshot = await FirebaseFirestore.instance.collection('dogs').get();
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        return Dog.fromFirestore(data);
-      }).toList();
+
+      // 각 문서를 Dog 객체로 변환
+      return snapshot.docs.map((doc) => Dog.fromFirestore(doc)).toList();
     } catch (e) {
-      print("Firestore fetch error: $e");
+      print("🔥 Firestore fetch error: $e");
       return [];
     }
   }
