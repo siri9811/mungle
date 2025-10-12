@@ -18,6 +18,11 @@ migrate_working_dir/
 *.iws
 .idea/
 
+# Flutter auto-generated plugin files
+**/flutter/generated_plugin_registrant.*
+**/Flutter/GeneratedPluginRegistrant.swift
+
+
 # Sensitive Firebase config file
 /android/app/google-services.json
 /google-services.json

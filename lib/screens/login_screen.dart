@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+
 import '../services/auth_service.dart';
+import 'signup_screen.dart';
+import 'main_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -11,20 +16,53 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
 
-  void _signIn(Future<void> Function(BuildContext) signInMethod) async {
+  Future<void> _signIn(Future<void> Function(BuildContext) signInMethod) async {
     if (_isLoading) return;
     setState(() => _isLoading = true);
-    
-    await signInMethod(context);
-    
-    if (mounted) {
-      setState(() => _isLoading = false);
+
+    try {
+      await signInMethod(context);
+
+      final user = firebase_auth.FirebaseAuth.instance.currentUser;
+      if (user == null) throw Exception("로그인 정보가 없습니다.");
+
+      // Firestore에서 유저 문서 확인
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      final data = userDoc.data();
+
+      if (userDoc.exists && data != null && data['name'] != null) {
+        // 기존 유저 → 메인 화면 이동
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const MainScreen()),
+          );
+        }
+      } else {
+        // 신규 유저 → 회원가입 화면 이동
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const SignupScreen()),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint("🔥 로그인 중 오류: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("로그인 실패: $e")),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // 버튼 너비를 일정하게 유지하기 위한 상수
     const double buttonWidth = 300.0;
 
     return Scaffold(
@@ -35,40 +73,44 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Text('Mungle', style: TextStyle(fontSize: 40, fontWeight: FontWeight.bold)),
+              // 🔹 로고 + 텍스트 (틴더 스타일)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Image.asset(
+                    'assets/images/mungle_logo.png',
+                    width: 48,
+                    height: 48,
+                  ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'Mungle',
+                    style: TextStyle(
+                      fontSize: 40,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ],
+              ),
+
               const SizedBox(height: 100),
-              
+
+              // 🔹 로딩 중일 때 로딩 스피너 표시
               _isLoading
                   ? const SizedBox(
-                      // 버튼 높이 + 간격과 비슷하게 맞춰줍니다.
-                      height: 110, 
+                      height: 110,
                       child: Center(child: CircularProgressIndicator()),
                     )
                   : Column(
                       children: [
-                        // ★★★ 구글 로그인 버튼 ★★★
                         SizedBox(
-                          width: buttonWidth, // 너비 강제
+                          width: buttonWidth,
                           child: InkWell(
                             onTap: () => _signIn(AuthService.signInWithGoogle),
                             child: Image.asset(
                               'assets/images/google_login_button.png',
-                              // fit: 이미지가 주어진 공간 안에서 어떻게 보일지 결정
-                              // BoxFit.fill: 꽉 채우지만 비율이 깨질 수 있음
-                              // BoxFit.contain: 비율을 유지하며 공간 안에 모두 보임 (추천)
-                              fit: BoxFit.fill, 
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        
-                        // ★★★ 카카오 로그인 버튼 ★★★
-                        SizedBox(
-                          width: buttonWidth, // 구글 버튼과 동일한 너비로 강제
-                          child: InkWell(
-                            onTap: () => _signIn(AuthService.signInWithKakao),
-                            child: Image.asset(
-                              'assets/images/kakao_login_button.png',
                               fit: BoxFit.fill,
                             ),
                           ),
@@ -82,4 +124,3 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
-

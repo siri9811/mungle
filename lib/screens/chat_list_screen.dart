@@ -8,7 +8,7 @@ class ChatListScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser!;
+    final currentUser = FirebaseAuth.instance.currentUser!;
 
     return Scaffold(
       appBar: AppBar(
@@ -18,18 +18,16 @@ class ChatListScreen extends StatelessWidget {
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
-            .collection('matches')
-            .where('users', arrayContains: user.uid)
-            .orderBy('createdAt', descending: true)
+            .collection('chats')
+            .where('users', arrayContains: currentUser.uid)
+            .orderBy('updatedAt', descending: true)
             .snapshots(),
         builder: (context, snapshot) {
-          if (!snapshot.hasData) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final matches = snapshot.data!.docs;
-
-          if (matches.isEmpty) {
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
             return const Center(
               child: Text(
                 "아직 매칭된 상대가 없습니다 🐾",
@@ -38,31 +36,69 @@ class ChatListScreen extends StatelessWidget {
             );
           }
 
+          final chats = snapshot.data!.docs;
+
           return ListView.builder(
-            itemCount: matches.length,
+            itemCount: chats.length,
             itemBuilder: (context, index) {
-              final match = matches[index];
-              final data = match.data() as Map<String, dynamic>;
+              final data = chats[index].data() as Map<String, dynamic>;
+              final chatId = chats[index].id;
 
-              final dogName = data['dogName'] ?? '강아지';
-              final lastMessage = data['lastMessage'] ?? '아직 대화가 없습니다 🐶';
+              final users = List<String>.from(data['users'] ?? []);
+              final otherUserId = users.firstWhere(
+                (id) => id != currentUser.uid,
+                orElse: () => "unknown",
+              );
 
-              return ListTile(
-                leading: const CircleAvatar(
-                  backgroundColor: Colors.orangeAccent,
-                  child: Icon(Icons.pets, color: Colors.white),
-                ),
-                title: Text(dogName, style: const TextStyle(fontSize: 16)),
-                subtitle: Text(
-                  lastMessage,
-                  style: const TextStyle(color: Colors.grey),
-                ),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ChatScreen(matchId: match.id),
+              final lastMessage = data['lastMessage'] ?? "아직 대화가 없습니다 🐶";
+
+              return FutureBuilder<DocumentSnapshot>(
+                future: FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(otherUserId)
+                    .get(),
+                builder: (context, userSnapshot) {
+                  if (!userSnapshot.hasData) {
+                    return const ListTile(
+                      title: Text("불러오는 중..."),
+                    );
+                  }
+
+                  final userData =
+                      userSnapshot.data!.data() as Map<String, dynamic>? ?? {};
+
+                  final dogName = userData['name'] ?? "강아지";
+                  final photoUrl = userData['imageURL'] ?? ''; // ✅ 필드명 주의 (imageURL)
+
+                  return ListTile(
+                    leading: CircleAvatar(
+                      radius: 25,
+                      backgroundColor: Colors.orangeAccent,
+                      backgroundImage: (photoUrl.isNotEmpty)
+                          ? NetworkImage(photoUrl)
+                          : null,
+                      child: (photoUrl.isEmpty)
+                          ? const Icon(Icons.pets, color: Colors.white)
+                          : null,
                     ),
+                    title: Text(
+                      dogName,
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                    subtitle: Text(
+                      lastMessage,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.grey),
+                    ),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ChatScreen(matchId: chatId),
+                        ),
+                      );
+                    },
                   );
                 },
               );
