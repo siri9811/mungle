@@ -30,13 +30,12 @@ class _MainScreenState extends State<MainScreen> {
     _updateUserLocation();
   }
 
-  /// 현재 사용자 위치를 Firestore에 업데이트
+  /// ✅ 현재 사용자 위치를 Firestore에 업데이트
   Future<void> _updateUserLocation() async {
     if (_isUpdatingLocation) return; // 중복 방지
     _isUpdatingLocation = true;
 
     try {
-      // 위치 권한 확인
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
@@ -47,7 +46,6 @@ class _MainScreenState extends State<MainScreen> {
         return;
       }
 
-      // 위치 가져오기
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
@@ -72,17 +70,29 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white, //
       body: _screens[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(
+        backgroundColor: Colors.white, // 
+        elevation: 0, // 
         currentIndex: _currentIndex,
         type: BottomNavigationBarType.fixed,
         selectedItemColor: Colors.deepPurple,
         unselectedItemColor: Colors.grey,
         onTap: (index) => setState(() => _currentIndex = index),
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
-          BottomNavigationBarItem(icon: Icon(Icons.chat_bubble), label: "Chat"),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: "Home",
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.chat_bubble),
+            label: "Chat",
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: "Profile",
+          ),
         ],
       ),
     );

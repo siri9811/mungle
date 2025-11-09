@@ -11,10 +11,18 @@ class ChatListScreen extends StatelessWidget {
     final currentUser = FirebaseAuth.instance.currentUser!;
 
     return Scaffold(
+      backgroundColor: Colors.white, 
       appBar: AppBar(
-        title: const Text("매칭 & 채팅 💬"),
-        centerTitle: true,
+        backgroundColor: Colors.white, 
         elevation: 0,
+        centerTitle: true,
+        title: const Text(
+          "메세지",
+          style: TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
@@ -68,15 +76,15 @@ class ChatListScreen extends StatelessWidget {
                       userSnapshot.data!.data() as Map<String, dynamic>? ?? {};
 
                   final dogName = userData['name'] ?? "강아지";
-                  final photoUrl = userData['imageURL'] ?? ''; // ✅ 필드명 주의 (imageURL)
+                  final photoUrl = userData['imageURL'] ?? '';
 
                   return ListTile(
+                    tileColor: Colors.white, // ✅ 리스트 배경도 흰색 유지
                     leading: CircleAvatar(
                       radius: 25,
                       backgroundColor: Colors.orangeAccent,
-                      backgroundImage: (photoUrl.isNotEmpty)
-                          ? NetworkImage(photoUrl)
-                          : null,
+                      backgroundImage:
+                          (photoUrl.isNotEmpty) ? NetworkImage(photoUrl) : null,
                       child: (photoUrl.isEmpty)
                           ? const Icon(Icons.pets, color: Colors.white)
                           : null,

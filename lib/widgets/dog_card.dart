@@ -3,7 +3,6 @@ import '../models/dog.dart';
 
 class DogCard extends StatelessWidget {
   final Dog dog;
-
   const DogCard({super.key, required this.dog});
 
   @override
@@ -13,8 +12,8 @@ class DogCard extends StatelessWidget {
 
     return Center(
       child: Container(
-        width: screenWidth * 0.85, // 카드 가로 폭
-        height: screenHeight * 0.65, // 카드 높이 (적당한 비율)
+        width: screenWidth * 0.85,
+        height: screenHeight * 0.65, // 버튼 제외, 카드만 보여줌
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
@@ -29,21 +28,21 @@ class DogCard extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: Column(
           children: [
-            // 강아지 이미지 영역
-            SizedBox(
-              height: screenHeight * 0.45,
-              width: double.infinity,
+            // 🐶 이미지
+            Expanded(
+              flex: 7,
               child: dog.imageUrl.isNotEmpty
                   ? Image.network(
                       dog.imageUrl,
                       fit: BoxFit.cover,
+                      width: double.infinity,
                       errorBuilder: (context, error, stackTrace) =>
                           const Icon(Icons.pets, size: 80, color: Colors.grey),
                     )
                   : const Icon(Icons.pets, size: 100, color: Colors.grey),
             ),
 
-            // 정보 영역
+            // 📋 정보 영역
             Container(
               width: double.infinity,
               color: const Color(0xFFFFF8F0),
@@ -67,8 +66,6 @@ class DogCard extends StatelessWidget {
                       color: Colors.grey,
                     ),
                   ),
-
-                  // 거리 표시 추가 (null 안전)
                   if (dog.distanceKm != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 8.0),

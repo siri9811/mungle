@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../services/chat_service.dart';
 import '../services/dog_service.dart';
 import '../models/dog.dart';
+import 'partner_profile_screen.dart'; // ✅ 추가
 
 class ChatScreen extends StatefulWidget {
   final String matchId; // chats/{matchId}
@@ -24,6 +25,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _loadOtherUserProfile();
   }
 
+  /// 상대방 프로필 불러오기
   Future<void> _loadOtherUserProfile() async {
     try {
       final chatDoc = await FirebaseFirestore.instance
@@ -42,23 +44,45 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white, // ✅ 흰색 통일
       appBar: AppBar(
-        title: Row(
-          children: [
-            if (_otherDog?.imageUrl != null && _otherDog!.imageUrl.isNotEmpty)
-              CircleAvatar(
-                radius: 18,
-                backgroundImage: NetworkImage(_otherDog!.imageUrl),
-              )
-            else
-              const CircleAvatar(
-                radius: 18,
-                backgroundColor: Colors.orange,
-                child: Icon(Icons.pets, color: Colors.white),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.black),
+        title: GestureDetector(
+          onTap: () {
+            if (_otherDog != null) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => PartnerProfileScreen(dog: _otherDog!),
+                ),
+              );
+            }
+          },
+          child: Row(
+            children: [
+              if (_otherDog?.imageUrl != null && _otherDog!.imageUrl.isNotEmpty)
+                CircleAvatar(
+                  radius: 18,
+                  backgroundImage: NetworkImage(_otherDog!.imageUrl),
+                )
+              else
+                const CircleAvatar(
+                  radius: 18,
+                  backgroundColor: Colors.orange,
+                  child: Icon(Icons.pets, color: Colors.white),
+                ),
+              const SizedBox(width: 10),
+              Text(
+                _otherDog?.name ?? "채팅",
+                style: const TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            const SizedBox(width: 10),
-            Text(_otherDog?.name ?? "채팅"),
-          ],
+            ],
+          ),
         ),
       ),
       body: Column(
@@ -71,7 +95,12 @@ class _ChatScreenState extends State<ChatScreen> {
                   return const Center(child: CircularProgressIndicator());
                 }
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return const Center(child: Text("아직 메시지가 없습니다 🐾"));
+                  return const Center(
+                    child: Text(
+                      "아직 메시지가 없습니다 🐾",
+                      style: TextStyle(color: Colors.black87),
+                    ),
+                  );
                 }
 
                 final messages = snapshot.data!.docs;
@@ -122,9 +151,9 @@ class _ChatScreenState extends State<ChatScreen> {
                                   topLeft: const Radius.circular(12),
                                   topRight: const Radius.circular(12),
                                   bottomLeft: Radius.circular(
-                                      isMe ? 12 : 0), // 내 말풍선은 오른쪽만 둥글게
+                                      isMe ? 12 : 0),
                                   bottomRight: Radius.circular(
-                                      isMe ? 0 : 12), // 상대 말풍선은 왼쪽만 둥글게
+                                      isMe ? 0 : 12),
                                 ),
                               ),
                               child: Text(
@@ -141,6 +170,8 @@ class _ChatScreenState extends State<ChatScreen> {
               },
             ),
           ),
+
+          // 💬 메시지 입력 영역
           Padding(
             padding: const EdgeInsets.all(8),
             child: Row(
