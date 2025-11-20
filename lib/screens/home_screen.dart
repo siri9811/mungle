@@ -5,7 +5,7 @@ import '../models/dog.dart';
 import '../services/match_service.dart';
 import '../widgets/dog_card.dart';
 import '../widgets/app_logo.dart';
-import '../widgets/match_popup.dart'; // ✅ 매칭 팝업 위젯
+import '../widgets/match_popup.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -18,81 +18,83 @@ class _HomeScreenState extends State<HomeScreen> {
   final CardSwiperController controller = CardSwiperController();
   List<Dog> dogs = [];
   bool isLoading = true;
-  bool locationDenied = false;
+  bool permissionDenied = false;
 
   @override
   void initState() {
     super.initState();
-    _requestLocationFirst();
-    loadNearbyDogs();
+    _initLocationProcess();
   }
 
-  /// 📍 위치 권한 요청
-  Future<void> _requestLocationFirst() async {
+  /// 📌 위치 사용 흐름
+  ///
+  /// 1️⃣ 서비스 켜져 있는지 확인  
+  /// 2️⃣ 권한 확인  
+  /// 3️⃣ 권한 없으면 요청  
+  /// 4️⃣ 최종적으로 위치 좌표 읽기
+  Future<void> _initLocationProcess() async {
+    // 1. 서비스 ON?
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      setState(() {
+        permissionDenied = true;
+        isLoading = false;
+      });
+      return;
+    }
+
+    // 2. 현재 권한
     LocationPermission permission = await Geolocator.checkPermission();
 
-    if (permission == LocationPermission.denied) {
-      await Geolocator.requestPermission();
+    // 3. 권한 없으면 요청
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.unableToDetermine) {
+      permission = await Geolocator.requestPermission();
     }
+
+    // 4. 여전히 거부 상태인 경우
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      setState(() {
+        permissionDenied = true;
+        isLoading = false;
+      });
+      return;
+    }
+
+    // 5. 모든 조건 통과 → 위치 기반 데이터 로드
+    await _loadNearbyDogs();
   }
 
-  /// 🔍 근처 강아지 목록 불러오기
-  Future<void> loadNearbyDogs() async {
+  /// 📌 위치 기반 강아지 불러오기
+  Future<void> _loadNearbyDogs() async {
     try {
-      setState(() => isLoading = true);
-
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        setState(() {
-          locationDenied = true;
-          isLoading = false;
-        });
-        return;
-      }
-
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          setState(() {
-            locationDenied = true;
-            isLoading = false;
-          });
-          return;
-        }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        setState(() {
-          locationDenied = true;
-          isLoading = false;
-        });
-        return;
-      }
-
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
 
-      final fetchedDogs = await MatchService.getNearbyDogs(
+      final fetched = await MatchService.getNearbyDogs(
         userLat: position.latitude,
         userLng: position.longitude,
         maxDistanceKm: 1000,
       );
 
       setState(() {
-        dogs = fetchedDogs;
+        dogs = fetched;
         isLoading = false;
       });
     } catch (e) {
-      debugPrint("❌ Error loading nearby dogs: $e");
-      setState(() => isLoading = false);
+      debugPrint("❌ 위치 오류: $e");
+      setState(() {
+        permissionDenied = true;
+        isLoading = false;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    /// 로딩 중
+    /// 🔄 로딩 중
     if (isLoading) {
       return const Scaffold(
         backgroundColor: Colors.white,
@@ -100,8 +102,8 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    /// 위치 권한 거부
-    if (locationDenied) {
+    /// ❌ 권한 거부된 경우
+    if (permissionDenied) {
       return Scaffold(
         backgroundColor: Colors.white,
         body: Center(
@@ -118,7 +120,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  "근처 반려견을 찾기 위해 위치 접근 권한을 허용해주세요.",
+                  "근처 반려견을 찾기 위해 위치 권한을 허용해주세요.",
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 14, color: Colors.grey),
                 ),
@@ -129,16 +131,18 @@ class _HomeScreenState extends State<HomeScreen> {
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.pinkAccent,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 32, vertical: 12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
                   ),
                   child: const Text(
                     "설정에서 허용하기",
                     style: TextStyle(
-                        fontWeight: FontWeight.bold, color: Colors.white),
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],
@@ -148,7 +152,7 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    /// 주변 강아지 없음
+    /// 🐶 추천 강아지 없음
     if (dogs.isEmpty) {
       return const Scaffold(
         backgroundColor: Colors.white,
@@ -161,71 +165,39 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    /// ✅ 정상 화면
+    /// 🟢 정상 카드 UI
     return Scaffold(
-      backgroundColor: Colors.white, // ✅ 전체 흰색 배경
+      backgroundColor: Colors.white,
       appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
         title: const AppLogo(fontSize: 28, color: Colors.black),
         centerTitle: true,
-        backgroundColor: Colors.white, // ✅ 상단도 흰색
-        elevation: 0,
       ),
-      body: Container(
-        color: Colors.white, // ✅ body 내부까지 완전 흰색 통일
-        child: Column(
-          children: [
-            // 🐶 카드 스와이프
-            Expanded(
-              child: CardSwiper(
-                controller: controller,
-                cardsCount: dogs.length,
-                numberOfCardsDisplayed: 1,
-                isLoop: true,
-                onSwipe: (previousIndex, currentIndex, direction) async {
-                  final dog = dogs[previousIndex];
+      body: Column(
+        children: [
+          Expanded(
+            child: CardSwiper(
+              controller: controller,
+              cardsCount: dogs.length,
+              numberOfCardsDisplayed: 1,
+              isLoop: true,
+              onSwipe: (previousIndex, currentIndex, direction) async {
+                final dog = dogs[previousIndex];
 
-                  if (direction == CardSwiperDirection.right) {
-                    debugPrint("❤️ 좋아요: ${dog.name}");
-                    await MatchService.handleSwipe(dog, true);
+                if (direction == CardSwiperDirection.right) {
+                  await MatchService.handleSwipe(dog, true);
+                  if (mounted) showMatchPopup(context, dog);
+                } else if (direction == CardSwiperDirection.left) {
+                  await MatchService.handleSwipe(dog, false);
+                }
 
-                    // ✅ 매칭 성공 팝업
-                    if (mounted) showMatchPopup(context, dog);
-                  } else if (direction == CardSwiperDirection.left) {
-                    debugPrint("💔 싫어요: ${dog.name}");
-                    await MatchService.handleSwipe(dog, false);
-                  }
-
-                  return true;
-                },
-                cardBuilder: (context, index, percentX, percentY) {
-                  return DogCard(dog: dogs[index]);
-                },
-              ),
+                return true;
+              },
+              cardBuilder: (_, index, __, ___) => DogCard(dog: dogs[index]),
             ),
-
-            // ❤️ 좋아요 / 싫어요 버튼
-            Padding(
-              padding: const EdgeInsets.only(bottom: 60),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  FloatingActionButton(
-                    heroTag: "dislike",
-                    backgroundColor: Colors.grey,
-                    onPressed: () => controller.swipeLeft(),
-                    child: const Icon(Icons.close, color: Colors.white),
-                  ),
-                  FloatingActionButton(
-                    heroTag: "like",
-                    backgroundColor: Colors.pinkAccent,
-                    onPressed: () => controller.swipeRight(),
-                    child: const Icon(Icons.favorite, color: Colors.white),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
