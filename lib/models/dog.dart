@@ -6,9 +6,9 @@ class Dog {
   final int age;             // 나이
   final String breed;        // 품종
   final String imageUrl;     // 프로필 이미지 URL
-  final String? intro;       // ✅ 한줄소개 (optional)
-  final String? size;        // ✅ 크기 (소형, 중형, 대형)
-  final bool? vaccinated;    // ✅ 예방접종 여부
+  final String? intro;       // 한줄소개 (optional)
+  final String? size;        // 크기 (소형, 중형, 대형)
+  final bool? vaccinated;    // 예방접종 여부
   final double lat;          // 위도
   final double lng;          // 경도
   final double? distanceKm;  // 사용자와의 거리 (선택적)

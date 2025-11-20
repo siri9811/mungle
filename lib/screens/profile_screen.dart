@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
 import 'edit_profile_screen.dart';
+import 'mbti_test_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -18,7 +19,7 @@ class ProfileScreen extends StatelessWidget {
     }
 
     return Scaffold(
-      backgroundColor: Colors.white, // ✅ 밝은 배경 유지
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text(
           "프로필",
@@ -50,6 +51,7 @@ class ProfileScreen extends StatelessWidget {
           final size = data['size'] ?? '크기 정보 없음';
           final vaccinated = data['vaccinated'] == true ? "✅" : "❌";
           final imageUrl = data['imageUrl'] ?? '';
+          final mbti = data['mbti']; // ⭐ MBTI 가져오기
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(24),
@@ -83,6 +85,27 @@ class ProfileScreen extends StatelessWidget {
 
                 const SizedBox(height: 8),
 
+                // 🧡 MBTI 배지 추가
+                if (mbti != null) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.orange, width: 1.2),
+                    ),
+                    child: Text(
+                      "🐾 멍BTI: $mbti",
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.orange,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+
                 // 품종
                 Text(
                   breed,
@@ -92,7 +115,6 @@ class ProfileScreen extends StatelessWidget {
                   ),
                 ),
 
-                // 크기 / 예방접종 텍스트 (박스 없이 자연스럽게)
                 const SizedBox(height: 6),
                 Text(
                   "크기: $size • 예방접종: $vaccinated",
@@ -111,24 +133,20 @@ class ProfileScreen extends StatelessWidget {
                   width: double.infinity,
                   child: ElevatedButton.icon(
                     onPressed: () async {
-                      // 🔹 프로필 수정 화면으로 이동 후 돌아올 때 새로고침
                       final result = await Navigator.push(
                         context,
-                        MaterialPageRoute(
-                            builder: (_) => const EditProfileScreen()),
+                        MaterialPageRoute(builder: (_) => const EditProfileScreen()),
                       );
 
-                      // 🔹 수정 완료 후 새로고침
                       if (result == true) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text("프로필이 업데이트되었습니다 ✅")),
+                          const SnackBar(content: Text("프로필이 업데이트되었습니다 ✅")),
                         );
+
                         // ignore: use_build_context_synchronously
                         Navigator.pushReplacement(
                           context,
-                          MaterialPageRoute(
-                              builder: (_) => const ProfileScreen()),
+                          MaterialPageRoute(builder: (_) => const ProfileScreen()),
                         );
                       }
                     },
@@ -142,6 +160,37 @@ class ProfileScreen extends StatelessWidget {
                     icon: const Icon(Icons.edit, color: Colors.white),
                     label: const Text(
                       "프로필 수정하기",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // 🐾 멍BTI 검사하기 버튼
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const MbtiTestScreen()),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                    ),
+                    icon: const Text("🐶", style: TextStyle(fontSize: 20)),
+                    label: const Text(
+                      "멍BTI 검사하기",
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 17,

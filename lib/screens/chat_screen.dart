@@ -4,10 +4,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../services/chat_service.dart';
 import '../services/dog_service.dart';
 import '../models/dog.dart';
-import 'partner_profile_screen.dart'; // ✅ 추가
+import 'partner_profile_screen.dart';
 
 class ChatScreen extends StatefulWidget {
-  final String matchId; // chats/{matchId}
+  final String matchId;
   const ChatScreen({super.key, required this.matchId});
 
   @override
@@ -23,6 +23,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
     _loadOtherUserProfile();
+    _markMessagesAsRead();
   }
 
   /// 상대방 프로필 불러오기
@@ -32,19 +33,43 @@ class _ChatScreenState extends State<ChatScreen> {
           .collection('chats')
           .doc(widget.matchId)
           .get();
+
       final users = List<String>.from(chatDoc['users']);
       final otherUid = users.firstWhere((id) => id != _currentUser!.uid);
       final dog = await DogService.getDogById(otherUid);
       setState(() => _otherDog = dog);
     } catch (e) {
-      debugPrint("🔥 프로필 로드 실패: $e");
+      debugPrint("프로필 로드 실패: $e");
+    }
+  }
+
+  /// 내가 읽지 않은 메시지를 읽음 처리
+  Future<void> _markMessagesAsRead() async {
+    final uid = _currentUser!.uid;
+
+    final ref = FirebaseFirestore.instance
+        .collection('chats')
+        .doc(widget.matchId)
+        .collection('messages');
+
+    final snap = await ref.get();
+
+    for (var doc in snap.docs) {
+      final data = doc.data();
+      final readBy = List<String>.from(data['readBy'] ?? []);
+
+      if (data['senderId'] != uid && !readBy.contains(uid)) {
+        await doc.reference.update({
+          'readBy': FieldValue.arrayUnion([uid])
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white, // ✅ 흰색 통일
+      backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -62,7 +87,8 @@ class _ChatScreenState extends State<ChatScreen> {
           },
           child: Row(
             children: [
-              if (_otherDog?.imageUrl != null && _otherDog!.imageUrl.isNotEmpty)
+              if (_otherDog?.imageUrl != null &&
+                  _otherDog!.imageUrl.isNotEmpty)
                 CircleAvatar(
                   radius: 18,
                   backgroundImage: NetworkImage(_otherDog!.imageUrl),
@@ -113,54 +139,86 @@ class _ChatScreenState extends State<ChatScreen> {
                         messages[index].data() as Map<String, dynamic>;
                     final isMe = data['senderId'] == _currentUser?.uid;
 
+                    final readBy = List<String>.from(data['readBy'] ?? []);
+                    final otherUid = _otherDog?.id;
+
+                    /// 🔥 내가 보낸 메시지인데 상대가 안 읽음 → 1 표시
+                    final unreadByOther =
+                        isMe && otherUid != null && !readBy.contains(otherUid);
+
                     return Padding(
                       padding: const EdgeInsets.symmetric(
                           vertical: 6, horizontal: 10),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        mainAxisAlignment: isMe
-                            ? MainAxisAlignment.end
-                            : MainAxisAlignment.start,
+                      child: Column(
+                        crossAxisAlignment: isMe
+                            ? CrossAxisAlignment.end
+                            : CrossAxisAlignment.start,
                         children: [
-                          if (!isMe)
-                            Padding(
-                              padding:
-                                  const EdgeInsets.only(right: 8.0, bottom: 2),
-                              child: _otherDog?.imageUrl != null &&
-                                      _otherDog!.imageUrl.isNotEmpty
-                                  ? CircleAvatar(
-                                      radius: 18,
-                                      backgroundImage:
-                                          NetworkImage(_otherDog!.imageUrl),
-                                    )
-                                  : const CircleAvatar(
-                                      radius: 18,
-                                      backgroundColor: Colors.orange,
-                                      child:
-                                          Icon(Icons.pets, color: Colors.white),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            mainAxisAlignment: isMe
+                                ? MainAxisAlignment.end
+                                : MainAxisAlignment.start,
+                            children: [
+                              if (!isMe)
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                      right: 8.0, bottom: 2),
+                                  child: _otherDog?.imageUrl != null &&
+                                          _otherDog!.imageUrl.isNotEmpty
+                                      ? CircleAvatar(
+                                          radius: 18,
+                                          backgroundImage:
+                                              NetworkImage(_otherDog!.imageUrl),
+                                        )
+                                      : const CircleAvatar(
+                                          radius: 18,
+                                          backgroundColor: Colors.orange,
+                                          child: Icon(Icons.pets,
+                                              color: Colors.white),
+                                        ),
+                                ),
+
+                              /// 🔥 내가 보낸 메시지 → "1" 표시가 말풍선 왼쪽에 오도록 구성
+                              if (isMe) ...[
+                                if (unreadByOther)
+                                  const Padding(
+                                    padding: EdgeInsets.only(right: 6),
+                                    child: Text(
+                                      "1",
+                                      style: TextStyle(
+                                        color: Colors.redAccent,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
-                            ),
-                          Flexible(
-                            child: Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: isMe
-                                    ? Colors.orange.shade200
-                                    : Colors.grey.shade300,
-                                borderRadius: BorderRadius.only(
-                                  topLeft: const Radius.circular(12),
-                                  topRight: const Radius.circular(12),
-                                  bottomLeft: Radius.circular(
-                                      isMe ? 12 : 0),
-                                  bottomRight: Radius.circular(
-                                      isMe ? 0 : 12),
+                                  ),
+                              ],
+
+                              /// 🔥 말풍선
+                              Flexible(
+                                child: Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: isMe
+                                        ? Colors.orange.shade200
+                                        : Colors.grey.shade300,
+                                    borderRadius: BorderRadius.only(
+                                      topLeft: const Radius.circular(12),
+                                      topRight: const Radius.circular(12),
+                                      bottomLeft:
+                                          Radius.circular(isMe ? 12 : 0),
+                                      bottomRight:
+                                          Radius.circular(isMe ? 0 : 12),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    data['text'] ?? '',
+                                    style: const TextStyle(fontSize: 16),
+                                  ),
                                 ),
                               ),
-                              child: Text(
-                                data['text'] ?? '',
-                                style: const TextStyle(fontSize: 16),
-                              ),
-                            ),
+                            ],
                           ),
                         ],
                       ),
@@ -171,7 +229,7 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
 
-          // 💬 메시지 입력 영역
+          // 메시지 입력 영역
           Padding(
             padding: const EdgeInsets.all(8),
             child: Row(

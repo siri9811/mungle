@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:mungle/services/push_service.dart';
 
 import 'firebase_options.dart';
 import 'screens/login_screen.dart';
@@ -11,7 +12,7 @@ void main() async {
 
   // ✅ Firebase 초기화 (한 번만)
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-
+  await PushService.initFCM();
   // 🚫 개발 중 로그인 초기화 (테스트용, 실제 서비스 시 삭제)
   await firebase_auth.FirebaseAuth.instance.signOut();
   await GoogleSignIn().signOut();

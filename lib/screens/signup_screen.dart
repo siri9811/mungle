@@ -15,7 +15,7 @@ class SignupScreen extends StatefulWidget {
 }
 
 class _SignupScreenState extends State<SignupScreen> {
-  int _step = 0; // 현재 스텝 인덱스
+  int _step = 0;
   final _nameController = TextEditingController();
   final _ageController = TextEditingController();
   final _breedController = TextEditingController();
@@ -31,20 +31,17 @@ class _SignupScreenState extends State<SignupScreen> {
   void initState() {
     super.initState();
 
-    // 🔹 입력값 변경 시 상태 갱신 (버튼 즉시 반응)
     _nameController.addListener(() => setState(() {}));
     _ageController.addListener(() => setState(() {}));
     _breedController.addListener(() => setState(() {}));
     _introController.addListener(() => setState(() {}));
   }
 
-  /// 🔹 갤러리에서 이미지 선택
   Future<void> _pickImage() async {
     final picked = await _picker.pickImage(source: ImageSource.gallery);
     if (picked != null) setState(() => _image = picked);
   }
 
-  /// 🔹 Firestore에 등록
   Future<void> _submitForm() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -102,7 +99,6 @@ class _SignupScreenState extends State<SignupScreen> {
     }
   }
 
-  /// 🔹 단계별 유효성 검사
   bool _isStepValid() {
     switch (_step) {
       case 0:
@@ -116,7 +112,7 @@ class _SignupScreenState extends State<SignupScreen> {
       case 4:
         return _size != null;
       case 5:
-        return true; // 예방접종은 선택사항
+        return true;
       case 6:
         return _image != null;
       default:
@@ -162,7 +158,23 @@ class _SignupScreenState extends State<SignupScreen> {
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
                 child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 400),
+                  duration: const Duration(milliseconds: 260),
+
+                  /// 🔥🔥 자연스러운 페이드 + 슬라이드 애니메이션 적용
+                  transitionBuilder: (child, animation) {
+                    final fade = FadeTransition(opacity: animation, child: child);
+
+                    final slide = SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(0.05, 0), // 아주 약하게 오른쪽에서 등장
+                        end: Offset.zero,
+                      ).animate(animation),
+                      child: fade,
+                    );
+
+                    return slide;
+                  },
+
                   child: _buildStepContent(pink),
                 ),
               ),
@@ -170,11 +182,11 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 
-  /// 🔹 단계별 UI 구성
   Widget _buildStepContent(Color pink) {
     switch (_step) {
       case 0:
         return _stepTemplate(
+          key: const ValueKey(0),
           title: "이름이 무엇인가요?",
           description: "프로필에 표시될 이름입니다.",
           child: TextField(
@@ -185,6 +197,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
       case 1:
         return _stepTemplate(
+          key: const ValueKey(1),
           title: "반려견의 나이는 몇 살인가요?",
           description: "프로필에는 생일이 아닌 나이가 표시됩니다.",
           child: TextField(
@@ -196,6 +209,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
       case 2:
         return _stepTemplate(
+          key: const ValueKey(2),
           title: "품종은 무엇인가요?",
           description: "예: 말티즈, 푸들, 시바견",
           child: TextField(
@@ -206,6 +220,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
       case 3:
         return _stepTemplate(
+          key: const ValueKey(3),
           title: "한줄소개를 입력해주세요",
           description: "자신과 반려견을 간단히 표현해보세요!",
           child: TextField(
@@ -218,6 +233,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
       case 4:
         return _stepTemplate(
+          key: const ValueKey(4),
           title: "크기를 선택해주세요",
           description: "반려견의 체형을 기준으로 선택해주세요.",
           child: Wrap(
@@ -232,6 +248,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
       case 5:
         return _stepTemplate(
+          key: const ValueKey(5),
           title: "예방접종을 완료했나요?",
           description: "필수 접종이 완료되었는지 확인해주세요.",
           child: Switch(
@@ -243,6 +260,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
       case 6:
         return _stepTemplate(
+          key: const ValueKey(6),
           title: "반려견의 사진을 등록해주세요",
           description: "가장 예쁜 사진 한 장을 선택해주세요.",
           child: GestureDetector(
@@ -267,8 +285,8 @@ class _SignupScreenState extends State<SignupScreen> {
     }
   }
 
-  /// 🔹 공통 템플릿
   Widget _stepTemplate({
+    required Key key,
     required String title,
     required String description,
     required Widget child,
@@ -278,7 +296,7 @@ class _SignupScreenState extends State<SignupScreen> {
     final bool isValid = _isStepValid();
 
     return Column(
-      key: ValueKey(title),
+      key: key,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         LinearProgressIndicator(
@@ -320,7 +338,6 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 
-  /// 🔹 크기 선택 칩
   Widget _buildChoiceChip(String label) {
     const pink = Colors.pinkAccent;
     return ChoiceChip(

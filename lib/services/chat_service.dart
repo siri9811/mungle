@@ -15,7 +15,7 @@ class ChatService {
         .snapshots();
   }
 
-  /// 메시지 전송
+  /// 메시지 전송 (+ readBy 필드 포함)
   static Future<void> sendMessage(String matchId, String text) async {
     final user = _auth.currentUser;
     if (user == null) return;
@@ -31,11 +31,15 @@ class ChatService {
         'senderId': user.uid,
         'text': text,
         'createdAt': FieldValue.serverTimestamp(),
+
+        // 읽음 처리: 보낸 사람만 기본 읽음 상태
+        'readBy': [user.uid],
       });
 
       // 상위 chats 문서 갱신
       await _db.collection('chats').doc(matchId).update({
         'lastMessage': text,
+        'lastSenderId': user.uid,
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
