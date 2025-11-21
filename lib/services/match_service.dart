@@ -1,7 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import '../models/dog.dart';
 import 'dog_service.dart';
+import '../utils/constants.dart';
 
 class MatchService {
   static final _db = FirebaseFirestore.instance;
@@ -11,7 +13,7 @@ class MatchService {
   static Future<List<Dog>> getNearbyDogs({
     required double userLat,
     required double userLng,
-    double maxDistanceKm = 1000,
+    double maxDistanceKm = AppConstants.maxMatchDistanceKm,
   }) async {
     try {
       final currentUid = _auth.currentUser?.uid;
@@ -41,7 +43,7 @@ class MatchService {
 
       return nearby;
     } catch (e) {
-      print("🔥 MatchService.getNearbyDogs error: $e");
+      debugPrint("🔥 MatchService.getNearbyDogs error: $e");
       return [];
     }
   }
@@ -77,7 +79,7 @@ class MatchService {
         }, SetOptions(merge: true));
       }
     } catch (e) {
-      print("🔥 MatchService.handleSwipe error: $e");
+      debugPrint("🔥 MatchService.handleSwipe error: $e");
     }
   }
 
@@ -138,9 +140,9 @@ class MatchService {
       });
 
       await batch.commit();
-      print("💬 즉시 매칭 생성 완료 ($uid1 ↔ $uid2)");
+      debugPrint("💬 즉시 매칭 생성 완료 ($uid1 ↔ $uid2)");
     } catch (e) {
-      print("🔥 MatchService._createMatch error: $e");
+      debugPrint("🔥 MatchService._createMatch error: $e");
     }
   }
 }

@@ -1,10 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../models/dog.dart';
+import '../providers/user_provider.dart';
 import 'main_screen.dart';
 
 class SignupScreen extends StatefulWidget {
@@ -23,7 +22,6 @@ class _SignupScreenState extends State<SignupScreen> {
   String? _size;
   bool _vaccinated = false;
   XFile? _image;
-  bool _isLoading = false;
 
   final ImagePicker _picker = ImagePicker();
 
@@ -54,48 +52,26 @@ class _SignupScreenState extends State<SignupScreen> {
       return;
     }
 
-    setState(() => _isLoading = true);
+    final userProvider = context.read<UserProvider>();
+    final success = await userProvider.registerDogProfile(
+      name: _nameController.text.trim(),
+      age: int.tryParse(_ageController.text) ?? 0,
+      breed: _breedController.text.trim(),
+      intro: _introController.text.trim(),
+      size: _size!,
+      vaccinated: _vaccinated,
+      image: _image!,
+    );
 
-    try {
-      final file = File(_image!.path);
-      final ref = FirebaseStorage.instance
-          .ref()
-          .child('user_profiles/${user.uid}/profile.jpg');
-      await ref.putFile(file);
-      final imageUrl = await ref.getDownloadURL();
-
-      final dog = Dog(
-        id: user.uid,
-        name: _nameController.text.trim(),
-        age: int.tryParse(_ageController.text) ?? 0,
-        breed: _breedController.text.trim(),
-        imageUrl: imageUrl,
-        lat: 0,
-        lng: 0,
-      );
-
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-        ...dog.toMap(),
-        'intro': _introController.text.trim(),
-        'size': _size,
-        'vaccinated': _vaccinated,
-        'email': user.email ?? '',
-        'displayName': user.displayName ?? '',
-        'createdAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-
-      if (!mounted) return;
+    if (success && mounted) {
       _showSnack("🐶 반려견 프로필 등록 완료!");
-
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => const MainScreen()),
         (route) => false,
       );
-    } catch (e) {
-      _showSnack("등록 중 오류 발생: $e");
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+    } else if (userProvider.errorMessage != null && mounted) {
+      _showSnack(userProvider.errorMessage!);
     }
   }
 
@@ -139,6 +115,7 @@ class _SignupScreenState extends State<SignupScreen> {
   @override
   Widget build(BuildContext context) {
     const pink = Colors.pinkAccent;
+    final isLoading = context.select<UserProvider, bool>((p) => p.isLoading);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -152,7 +129,7 @@ class _SignupScreenState extends State<SignupScreen> {
               )
             : null,
       ),
-      body: _isLoading
+      body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : SafeArea(
               child: SingleChildScrollView(

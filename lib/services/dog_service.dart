@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import '../models/dog.dart';
 
 class DogService {
@@ -11,7 +12,7 @@ class DogService {
       final snapshot = await _db.collection('users').get();
       return snapshot.docs.map((doc) => Dog.fromFirestore(doc)).toList();
     } catch (e) {
-      print("🔥 DogService.getAllDogs error: $e");
+      debugPrint("🔥 DogService.getAllDogs error: $e");
       return [];
     }
   }
@@ -22,7 +23,7 @@ class DogService {
       final doc = await _db.collection('users').doc(uid).get();
       return doc.exists ? Dog.fromFirestore(doc) : null;
     } catch (e) {
-      print("🔥 DogService.getDogById error: $e");
+      debugPrint("🔥 DogService.getDogById error: $e");
       return null;
     }
   }
@@ -33,7 +34,7 @@ class DogService {
       final doc = await _db.collection('users').doc(uid).get();
       return doc.data();
     } catch (e) {
-      print("🔥 DogService.getCurrentUserData error: $e");
+      debugPrint("🔥 DogService.getCurrentUserData error: $e");
       return null;
     }
   }

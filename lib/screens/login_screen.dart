@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:provider/provider.dart';
 
-import '../services/auth_service.dart';
+import '../providers/auth_provider.dart';
+import '../utils/constants.dart';
 import 'signup_screen.dart';
 import 'main_screen.dart';
 
@@ -14,18 +16,41 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  bool _isLoading = false;
+  
+  @override
+  void initState() {
+    super.initState();
+    // 화면 진입 시 이미 로그인 되어있는지 확인
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkLoginStatus();
+    });
+  }
 
-  Future<void> _signIn(Future<void> Function(BuildContext) signInMethod) async {
-    if (_isLoading) return;
-    setState(() => _isLoading = true);
+  Future<void> _checkLoginStatus() async {
+    final user = firebase_auth.FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      await _navigateBasedOnUser(user);
+    }
+  }
 
+  Future<void> _handleGoogleLogin() async {
+    final authProvider = context.read<AuthProvider>();
+    final success = await authProvider.signInWithGoogle();
+
+    if (success && mounted) {
+      final user = authProvider.user;
+      if (user != null) {
+        await _navigateBasedOnUser(user);
+      }
+    } else if (authProvider.errorMessage != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(authProvider.errorMessage!), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  Future<void> _navigateBasedOnUser(firebase_auth.User user) async {
     try {
-      await signInMethod(context);
-
-      final user = firebase_auth.FirebaseAuth.instance.currentUser;
-      if (user == null) throw Exception("로그인 정보가 없습니다.");
-
       // Firestore에서 유저 문서 확인
       final userDoc = await FirebaseFirestore.instance
           .collection('users')
@@ -34,17 +59,15 @@ class _LoginScreenState extends State<LoginScreen> {
 
       final data = userDoc.data();
 
-      if (userDoc.exists && data != null && data['name'] != null) {
-        // 기존 유저 → 메인 화면 이동
-        if (mounted) {
+      if (mounted) {
+        if (userDoc.exists && data != null && data['name'] != null) {
+          // 기존 유저 → 메인 화면 이동
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (_) => const MainScreen()),
           );
-        }
-      } else {
-        // 신규 유저 → 회원가입 화면 이동
-        if (mounted) {
+        } else {
+          // 신규 유저 → 회원가입 화면 이동
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (_) => const SignupScreen()),
@@ -52,18 +75,19 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       }
     } catch (e) {
-      debugPrint("🔥 로그인 중 오류: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("로그인 실패: $e")),
-      );
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+      debugPrint("🔥 유저 정보 확인 중 오류: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("${AppConstants.loginFailed}$e")),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     const double buttonWidth = 300.0;
+    final isLoading = context.select<AuthProvider, bool>((p) => p.isLoading);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -98,7 +122,7 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 100),
 
               // 🔹 로딩 중일 때 로딩 스피너 표시
-              _isLoading
+              isLoading
                   ? const SizedBox(
                       height: 110,
                       child: Center(child: CircularProgressIndicator()),
@@ -108,7 +132,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         SizedBox(
                           width: buttonWidth,
                           child: InkWell(
-                            onTap: () => _signIn(AuthService.signInWithGoogle),
+                            onTap: _handleGoogleLogin,
                             child: Image.asset(
                               'assets/images/google_login_button.png',
                               fit: BoxFit.fill,

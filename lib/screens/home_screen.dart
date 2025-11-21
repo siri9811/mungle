@@ -5,6 +5,7 @@ import '../models/dog.dart';
 import '../services/match_service.dart';
 import '../widgets/dog_card.dart';
 import '../widgets/app_logo.dart';
+import '../utils/constants.dart';
 import '../widgets/match_popup.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -18,75 +19,68 @@ class _HomeScreenState extends State<HomeScreen> {
   final CardSwiperController controller = CardSwiperController();
   List<Dog> dogs = [];
   bool isLoading = true;
-  bool permissionDenied = false;
+  bool locationDenied = false;
 
   @override
   void initState() {
     super.initState();
-    _initLocationProcess();
+    loadNearbyDogs();
   }
 
-  /// 📌 위치 사용 흐름
-  ///
-  /// 1️⃣ 서비스 켜져 있는지 확인  
-  /// 2️⃣ 권한 확인  
-  /// 3️⃣ 권한 없으면 요청  
-  /// 4️⃣ 최종적으로 위치 좌표 읽기
-  Future<void> _initLocationProcess() async {
-    // 1. 서비스 ON?
-    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      setState(() {
-        permissionDenied = true;
-        isLoading = false;
-      });
-      return;
-    }
-
-    // 2. 현재 권한
-    LocationPermission permission = await Geolocator.checkPermission();
-
-    // 3. 권한 없으면 요청
-    if (permission == LocationPermission.denied ||
-        permission == LocationPermission.unableToDetermine) {
-      permission = await Geolocator.requestPermission();
-    }
-
-    // 4. 여전히 거부 상태인 경우
-    if (permission == LocationPermission.denied ||
-        permission == LocationPermission.deniedForever) {
-      setState(() {
-        permissionDenied = true;
-        isLoading = false;
-      });
-      return;
-    }
-
-    // 5. 모든 조건 통과 → 위치 기반 데이터 로드
-    await _loadNearbyDogs();
-  }
-
-  /// 📌 위치 기반 강아지 불러오기
-  Future<void> _loadNearbyDogs() async {
+  /// 📍 위치 권한 요청 + 거리 기반 강아지 리스트 불러오기
+  Future<void> loadNearbyDogs() async {
     try {
+      setState(() => isLoading = true);
+
+      // 위치 권한 요청
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        setState(() {
+          locationDenied = true;
+          isLoading = false;
+        });
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          setState(() {
+            locationDenied = true;
+            isLoading = false;
+          });
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        setState(() {
+          locationDenied = true;
+          isLoading = false;
+        });
+        return;
+      }
+
+      // ✅ 현재 위치 가져오기
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
 
-      final fetched = await MatchService.getNearbyDogs(
+      // ✅ MatchService에서 가까운 강아지 불러오기
+      final fetchedDogs = await MatchService.getNearbyDogs(
         userLat: position.latitude,
         userLng: position.longitude,
-        maxDistanceKm: 1000,
+        maxDistanceKm: AppConstants.maxMatchDistanceKm,
       );
 
       setState(() {
-        dogs = fetched;
+        dogs = fetchedDogs;
         isLoading = false;
       });
     } catch (e) {
-      debugPrint("❌ 위치 오류: $e");
+      debugPrint("❌ Error loading nearby dogs: $e");
       setState(() {
-        permissionDenied = true;
         isLoading = false;
       });
     }
@@ -97,15 +91,13 @@ class _HomeScreenState extends State<HomeScreen> {
     /// 🔄 로딩 중
     if (isLoading) {
       return const Scaffold(
-        backgroundColor: Colors.white,
         body: Center(child: CircularProgressIndicator()),
       );
     }
 
     /// ❌ 권한 거부된 경우
-    if (permissionDenied) {
+    if (locationDenied) {
       return Scaffold(
-        backgroundColor: Colors.white,
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -115,7 +107,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const Icon(Icons.location_off, size: 60, color: Colors.grey),
                 const SizedBox(height: 16),
                 const Text(
-                  "📍 위치 접근 권한이 필요합니다",
+                  AppConstants.locationPermissionRequired,
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
